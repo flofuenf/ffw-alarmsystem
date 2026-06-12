@@ -14,6 +14,8 @@ COPY . .
 ARG VITE_GOOGLE_MAPS_API_KEY=""
 ENV VITE_GOOGLE_MAPS_API_KEY=$VITE_GOOGLE_MAPS_API_KEY
 RUN npm run build
+# Dev-Abhaengigkeiten (vite, esbuild, pkg …) entfernen -> schlankeres Runtime-Image
+RUN npm prune --omit=dev
 
 # --- Runtime-Stage: nur das Noetige zum Starten ---
 FROM node:22-slim AS runtime

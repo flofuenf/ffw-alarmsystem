@@ -17,7 +17,9 @@
     "dist:mac": "node scripts/build-exe.mjs mac",
     "dist:all": "node scripts/build-exe.mjs all",
     "docker:build": "docker build -t ffw-alarmsystem .",
-    "docker:run": "docker run --rm -p 3001:3001 -v ffw-data:/app/server/data ffw-alarmsystem"
+    "docker:run": "docker run --rm -p 3001:3001 -v ffw-data:/app/server/data ffw-alarmsystem",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down"
   },
   "devDependencies": {
     "@yao-pkg/pkg": "^6.20.0",

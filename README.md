@@ -181,6 +181,25 @@ Danach erreichbar unter <http://localhost:3001> bzw. `http://<host-ip>:3001/moni
 - **Port ändern:** `-e PORT=8080 -p 8080:8080`.
 - **Piper-Sprachausgabe (optional):** den passenden Linux-Piper-Ordner als Volume einhängen: `-v /pfad/piper:/app/server/vendor/piper`. Ohne Piper nutzt die Ansage die Browser-Stimme.
 
+### Mit Docker Compose
+
+Einfacher Dauerbetrieb inkl. Daten-Volume und Auto-Neustart:
+
+```bash
+npm run docker:up      # docker compose up -d --build
+npm run docker:down    # docker compose down
+```
+
+Der Google-Maps-Key kann über eine `.env`-Datei im Projektordner gesetzt werden (Compose liest sie automatisch):
+
+```bash
+# .env
+VITE_GOOGLE_MAPS_API_KEY=DEIN_SCHLUESSEL
+PORT=3001
+```
+
+Die Daten liegen im benannten Volume `ffw-data`. Für Piper die entsprechende Zeile in [docker-compose.yml](docker-compose.yml) einkommentieren.
+
 ## Funkstatus (FMS)
 
 | Status | Bedeutung |

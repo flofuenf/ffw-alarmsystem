@@ -1,0 +1,22 @@
+services:
+  alarmsystem:
+    build:
+      context: .
+      args:
+        # Google-Maps-Key wird beim Bauen ins Frontend eingebacken (optional).
+        # Wert aus Umgebung oder aus einer .env-Datei im Projektordner.
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
+    image: ffw-alarmsystem
+    container_name: ffw-alarmsystem
+    ports:
+      - "${PORT:-3001}:3001"
+    environment:
+      - PORT=3001
+    volumes:
+      - ffw-data:/app/server/data
+      # Optional: Piper-Sprachausgabe (passenden Linux-Piper-Ordner einhängen)
+      # - ./piper:/app/server/vendor/piper:ro
+    restart: unless-stopped
+
+volumes:
+  ffw-data:
