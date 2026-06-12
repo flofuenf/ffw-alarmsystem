@@ -8,10 +8,9 @@ import { spawn } from "node:child_process";
 import { tmpdir, networkInterfaces } from "node:os";
 import { load, save } from "./db.js";
 import { buildAlarmfaxPdf } from "./alarmfax.js";
+import { DATA_DIR, PUBLIC_DIR, PIPER_DIR } from "./paths.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
-const DATA_DIR = join(__dirname, "..", "data");
 const GONG_FILE = join(DATA_DIR, "gong.bin");
 const ALARMFAX_DIR = join(DATA_DIR, "alarmfax");
 
@@ -20,9 +19,8 @@ const ALARMFAX_DIR = join(DATA_DIR, "alarmfax");
 // genutzt (per `npm run setup:piper` geladen). Ueberschreibbar via Umgebung:
 //   PIPER_BIN   = Pfad zur Piper-Executable
 //   PIPER_MODEL = Pfad zum Stimmmodell .onnx
-const VENDOR_PIPER = join(__dirname, "..", "vendor", "piper");
-const DEFAULT_PIPER_BIN = join(VENDOR_PIPER, "piper", process.platform === "win32" ? "piper.exe" : "piper");
-const DEFAULT_PIPER_MODEL = join(VENDOR_PIPER, "de_DE-thorsten-medium.onnx");
+const DEFAULT_PIPER_BIN = join(PIPER_DIR, "piper", process.platform === "win32" ? "piper.exe" : "piper");
+const DEFAULT_PIPER_MODEL = join(PIPER_DIR, "de_DE-thorsten-medium.onnx");
 const PIPER_BIN = process.env.PIPER_BIN || (existsSync(DEFAULT_PIPER_BIN) ? DEFAULT_PIPER_BIN : "piper");
 const PIPER_MODEL = process.env.PIPER_MODEL || (existsSync(DEFAULT_PIPER_MODEL) ? DEFAULT_PIPER_MODEL : "");
 const piperAvailable = () => !!PIPER_MODEL && existsSync(PIPER_MODEL);
@@ -454,10 +452,9 @@ function checkScheduledAlarms() {
 setInterval(checkScheduledAlarms, 15000);
 
 // ---- Statisches Frontend (Produktion) ----
-const clientDist = join(__dirname, "..", "..", "client", "dist");
-if (existsSync(clientDist)) {
-  app.use(express.static(clientDist));
-  app.get("*", (req, res) => res.sendFile(join(clientDist, "index.html")));
+if (existsSync(PUBLIC_DIR)) {
+  app.use(express.static(PUBLIC_DIR));
+  app.get("*", (req, res) => res.sendFile(join(PUBLIC_DIR, "index.html")));
 }
 
 // "0.0.0.0" -> erreichbar von jedem Geraet im lokalen Netz

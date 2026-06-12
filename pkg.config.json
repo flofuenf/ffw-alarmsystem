@@ -1,0 +1,12 @@
+{
+  "name": "ffw-alarmsystem",
+  "version": "1.0.0",
+  "bin": "build/server.cjs",
+  "pkg": {
+    "assets": [
+      "build/public/**/*",
+      "node_modules/pdfkit/js/data/*.afm"
+    ],
+    "targets": ["node22-win-x64"]
+  }
+}

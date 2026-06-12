@@ -120,6 +120,23 @@ PIPER_BIN=/opt/piper/piper PIPER_MODEL=/opt/piper/stimme.onnx npm start
 
 Ist Piper nicht eingerichtet, dient die im Reiter **Alarmton** gewählte Browser-Stimme als Rückfall.
 
+## Standalone-Build (.exe – ohne Node/npm starten)
+
+Die gesamte App lässt sich in **eine eigenständige Windows-`.exe`** packen (Node-Runtime, Backend und gebautes Frontend sind enthalten). Auf dem Zielrechner muss **nichts** installiert sein.
+
+```bash
+npm run dist
+```
+
+Ergebnis: **`dist/alarmsystem-win.exe`** (~70 MB). Einfach starten (Doppelklick oder per Konsole) – der Server läuft dann auf Port 3001, alles unter <http://localhost:3001> bzw. der im Konsolenfenster angezeigten Netz-Adresse.
+
+**Wichtig / gut zu wissen:**
+- **Daten** werden in einem Ordner `data/` **neben der `.exe`** abgelegt (wird beim ersten Start angelegt) – einfach mitkopieren/sichern.
+- **Google-Maps-Key:** Der Schlüssel wird **beim Bauen** aus `client/.env` ins Frontend übernommen. Also vor `npm run dist` den Key in `client/.env` eintragen, sonst ist in der `.exe` keiner enthalten.
+- **Piper-Sprachausgabe (optional):** den Ordner `server/vendor/piper` neben die `.exe` nach `dist/vendor/piper` kopieren. Ohne Piper nutzt die Ansage die Browser-Stimme.
+- **Port ändern:** `PORT`-Umgebungsvariable setzen, z. B. (PowerShell) `$env:PORT=8080; .\alarmsystem-win.exe`.
+- **Andere Plattformen:** In `pkg.config.json` das Ziel anpassen – z. B. `node22-macos-arm64`, `node22-macos-x64` oder `node22-linux-x64` (mehrere Ziele gleichzeitig möglich).
+
 ## Funkstatus (FMS)
 
 | Status | Bedeutung |
