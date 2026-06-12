@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npm run build 2>&1)",
+      "PowerShell($npm = Get-Command npm.cmd -ErrorAction SilentlyContinue; if \\($npm\\) { $npm.Source } else { \"not found\"; Get-ChildItem \"$env:ProgramFiles\\\\nodejs\\\\npm.cmd\" -ErrorAction SilentlyContinue | Select-Object FullName })",
+      "PowerShell($env:Path = \"C:\\\\Program Files\\\\nodejs;\" + $env:Path; & \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\" run build --prefix client 2>&1 | Select-Object -Last 25)",
+      "PowerShell($ProgressPreference='SilentlyContinue'; try { $r = Invoke-WebRequest -Uri \"https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip\" -Method Head -TimeoutSec 30 -UseBasicParsing; \"HTTP \" + $r.StatusCode + \" size=\" + $r.Headers['Content-Length'] } catch { \"FEHLER: \" + $_.Exception.Message })"
+    ]
+  }
+}
