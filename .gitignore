@@ -6,3 +6,4 @@ server/data/alarmfax/
 server/vendor/
 .env
 .DS_Store
+.idea

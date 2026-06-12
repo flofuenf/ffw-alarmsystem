@@ -63,6 +63,26 @@ npm start              # Server liefert API + Frontend auf Port 3001
 
 Dann alles unter <http://localhost:3001> erreichbar. Den Monitor-Rechner auf der Wache einfach auf `/monitor` zeigen lassen.
 
+## Im lokalen Netz erreichbar (z. B. Monitor auf anderem Gerät)
+
+Der Server lauscht auf allen Netzwerk-Interfaces (`0.0.0.0`). Andere Geräte im selben WLAN/LAN (Tablet, zweiter Rechner, Smart-TV-Browser) können den Monitor direkt aufrufen.
+
+1. **Server starten** – empfohlen im Produktionsmodus (ein Prozess):
+   ```bash
+   npm run build
+   npm start
+   ```
+   Beim Start zeigt der Server die Netzwerk-Adressen an, z. B.:
+   ```
+   Im Netz: http://192.168.178.20:3001   (Monitor: http://192.168.178.20:3001/monitor)
+   ```
+2. **Auf dem anderen Gerät** im Browser diese Adresse öffnen, für den Monitor `…:3001/monitor`.
+3. **Firewall:** Beim ersten Start fragt Windows ggf., ob Node.js im Netzwerk kommunizieren darf → **zulassen** (privates Netz). Unter macOS ggf. die Firewall-Freigabe für `node` bestätigen.
+
+> Im Entwicklungsmodus (`npm run dev`) ist der Vite-Server ebenfalls im Netz erreichbar (`http://<IP>:5173`); für den Dauerbetrieb auf der Wache ist aber der Produktionsmodus (Port 3001) besser geeignet.
+
+Hinweis: Die Adresse hängt an der IP des Server-Rechners. Vergibt der Router per DHCP wechselnde IPs, lohnt sich eine feste IP/DHCP-Reservierung für den Server, damit die Monitor-URL gleich bleibt.
+
 ## Bedienung
 
 ### Fahrzeuge

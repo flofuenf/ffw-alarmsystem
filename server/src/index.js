@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "
 import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import { tmpdir } from "node:os";
+import { tmpdir, networkInterfaces } from "node:os";
 import { load, save } from "./db.js";
 import { buildAlarmfaxPdf } from "./alarmfax.js";
 
@@ -460,6 +460,18 @@ if (existsSync(clientDist)) {
   app.get("*", (req, res) => res.sendFile(join(clientDist, "index.html")));
 }
 
-app.listen(PORT, () => {
-  console.log(`FFW-Alarmsystem-Server laeuft auf http://localhost:${PORT}`);
+// "0.0.0.0" -> erreichbar von jedem Geraet im lokalen Netz
+app.listen(PORT, "0.0.0.0", () => {
+  const lanIps = [];
+  for (const list of Object.values(networkInterfaces())) {
+    for (const net of list || []) {
+      if (net.family === "IPv4" && !net.internal) lanIps.push(net.address);
+    }
+  }
+  console.log(`FFW-Alarmsystem-Server laeuft:`);
+  console.log(`  Lokal:   http://localhost:${PORT}   (Monitor: http://localhost:${PORT}/monitor)`);
+  for (const ip of lanIps) {
+    console.log(`  Im Netz: http://${ip}:${PORT}   (Monitor: http://${ip}:${PORT}/monitor)`);
+  }
+  if (lanIps.length === 0) console.log("  (keine Netzwerk-IP gefunden – mit Netzwerk verbunden?)");
 });
