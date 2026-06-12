@@ -155,6 +155,32 @@ codesign --force --sign - ./alarmsystem-macos-arm64        # Ad-hoc-Signatur (f�
 ```
 (Bei Intel-Macs `…-macos-x64` verwenden; die `codesign`-Zeile ist dort meist nicht zwingend.) Sauberer/ohne diese Schritte ist es, die App **direkt auf einem Mac** mit `npm run dist:mac` zu bauen.
 
+## Docker
+
+Die App lässt sich auch als Docker-Container betreiben (Backend + gebautes Frontend in einem Image).
+
+```bash
+# Image bauen
+npm run docker:build
+# (entspricht:  docker build -t ffw-alarmsystem .)
+
+# Container starten (Port 3001, Daten als benanntes Volume)
+npm run docker:run
+# (entspricht:  docker run --rm -p 3001:3001 -v ffw-data:/app/server/data ffw-alarmsystem)
+```
+
+Danach erreichbar unter <http://localhost:3001> bzw. `http://<host-ip>:3001/monitor`.
+
+**Hinweise:**
+- **Daten** liegen im Container unter `/app/server/data`. Mit `-v ffw-data:/app/server/data` (oder einem Host-Pfad) bleiben sie über Neustarts erhalten.
+- **Google-Maps-Key** beim Bauen mitgeben (wird ins Frontend eingebacken):
+  ```bash
+  docker build --build-arg VITE_GOOGLE_MAPS_API_KEY=DEIN_SCHLUESSEL -t ffw-alarmsystem .
+  ```
+  Alternativ vor dem Build den Key in `client/.env` eintragen.
+- **Port ändern:** `-e PORT=8080 -p 8080:8080`.
+- **Piper-Sprachausgabe (optional):** den passenden Linux-Piper-Ordner als Volume einhängen: `-v /pfad/piper:/app/server/vendor/piper`. Ohne Piper nutzt die Ansage die Browser-Stimme.
+
 ## Funkstatus (FMS)
 
 | Status | Bedeutung |
