@@ -6,7 +6,6 @@
     "assets": [
       "build/public/**/*",
       "node_modules/pdfkit/js/data/*.afm"
-    ],
-    "targets": ["node22-win-x64"]
+    ]
   }
 }

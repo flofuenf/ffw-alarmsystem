@@ -135,7 +135,25 @@ Ergebnis: **`dist/alarmsystem-win.exe`** (~70 MB). Einfach starten (Doppelklick 
 - **Google-Maps-Key:** Der Schlüssel wird **beim Bauen** aus `client/.env` ins Frontend übernommen. Also vor `npm run dist` den Key in `client/.env` eintragen, sonst ist in der `.exe` keiner enthalten.
 - **Piper-Sprachausgabe (optional):** den Ordner `server/vendor/piper` neben die `.exe` nach `dist/vendor/piper` kopieren. Ohne Piper nutzt die Ansage die Browser-Stimme.
 - **Port ändern:** `PORT`-Umgebungsvariable setzen, z. B. (PowerShell) `$env:PORT=8080; .\alarmsystem-win.exe`.
-- **Andere Plattformen:** In `pkg.config.json` das Ziel anpassen – z. B. `node22-macos-arm64`, `node22-macos-x64` oder `node22-linux-x64` (mehrere Ziele gleichzeitig möglich).
+
+### Für macOS / Linux bauen
+
+```bash
+npm run dist:mac     # macOS: Apple Silicon (arm64) + Intel (x64)
+npm run dist:all     # Windows + macOS + Linux
+# oder gezielt:
+node scripts/build-exe.mjs win mac-arm linux
+```
+Ergebnisse in `dist/`: `alarmsystem-macos-arm64`, `alarmsystem-macos-x64`, `alarmsystem-linux`. Die Builds funktionieren auch **plattformübergreifend** (z. B. macOS-Programm unter Windows bauen).
+
+**macOS-Programm startklar machen** (einmalig auf dem Mac, da unter Windows erzeugte Binaries unsigniert sind):
+```bash
+chmod +x ./alarmsystem-macos-arm64
+xattr -dr com.apple.quarantine ./alarmsystem-macos-arm64   # Gatekeeper-Quarantäne entfernen
+codesign --force --sign - ./alarmsystem-macos-arm64        # Ad-hoc-Signatur (für Apple Silicon nötig)
+./alarmsystem-macos-arm64
+```
+(Bei Intel-Macs `…-macos-x64` verwenden; die `codesign`-Zeile ist dort meist nicht zwingend.) Sauberer/ohne diese Schritte ist es, die App **direkt auf einem Mac** mit `npm run dist:mac` zu bauen.
 
 ## Funkstatus (FMS)
 

@@ -13,7 +13,9 @@
     "build": "npm run build --prefix client",
     "start": "npm run start --prefix server",
     "setup:piper": "node scripts/setup-piper.mjs",
-    "dist": "node scripts/build-exe.mjs"
+    "dist": "node scripts/build-exe.mjs",
+    "dist:mac": "node scripts/build-exe.mjs mac",
+    "dist:all": "node scripts/build-exe.mjs all"
   },
   "devDependencies": {
     "@yao-pkg/pkg": "^6.20.0",
