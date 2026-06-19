@@ -4,10 +4,10 @@
 //   node scripts/build-exe.mjs all        -> Windows, macOS, Linux
 //   node scripts/build-exe.mjs win mac-arm-> gezielte Auswahl
 //
-// Ergebnis: dist/alarmsystem-*  (+ optionaler vendor/piper-Ordner daneben)
+// Ergebnis: dist/alarmsystem-*
 
 import { execSync } from "node:child_process";
-import { rmSync, mkdirSync, cpSync, existsSync } from "node:fs";
+import { rmSync, mkdirSync, cpSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -71,6 +71,3 @@ for (const k of keys) {
 
 console.log("\nFertig. Erzeugt in dist/:");
 for (const k of keys) console.log(`  - ${ALL[k].out}`);
-if (existsSync(join(root, "server", "vendor", "piper"))) {
-  console.log("\nTipp: Fuer Piper-Sprachausgabe den passenden vendor/piper-Ordner neben das Programm legen.");
-}

@@ -12,7 +12,6 @@
     "dev": "concurrently -n SERVER,CLIENT -c green,cyan \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
     "build": "npm run build --prefix client",
     "start": "npm run start --prefix server",
-    "setup:piper": "node scripts/setup-piper.mjs",
     "dist": "node scripts/build-exe.mjs",
     "dist:mac": "node scripts/build-exe.mjs mac",
     "dist:all": "node scripts/build-exe.mjs all",

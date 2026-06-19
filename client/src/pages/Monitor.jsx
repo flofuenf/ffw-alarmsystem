@@ -19,14 +19,14 @@ export default function Monitor() {
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
 
-  // Ansage abspielen – bevorzugt Piper (Server), sonst Browser-Stimme.
+  // Ansage abspielen – bevorzugt Server-Stimme (Edge), sonst Browser-Stimme.
   // Promise wird aufgeloest, wenn die Ansage beendet ist.
   function announceOnce(text, voice) {
     if (serverTtsRef.current) return speakServer(text).catch(() => speak(text, voice));
     return speak(text, voice);
   }
 
-  // Verfuegbarkeit der Offline-Sprachsynthese (Piper) einmalig pruefen
+  // Verfuegbarkeit der Server-Sprachsynthese (Edge) einmalig pruefen
   useEffect(() => {
     fetch("/api/tts/status")
       .then((r) => r.json())

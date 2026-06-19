@@ -2,92 +2,31 @@ import express from "express";
 import cors from "cors";
 import { nanoid } from "nanoid";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
-import { dirname, join, basename } from "node:path";
-import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
-import { tmpdir, networkInterfaces } from "node:os";
+import { join } from "node:path";
+import { networkInterfaces } from "node:os";
 import { load, save } from "./db.js";
 import { buildAlarmfaxPdf } from "./alarmfax.js";
-import { DATA_DIR, PUBLIC_DIR, PIPER_DIR } from "./paths.js";
+import { DATA_DIR, PUBLIC_DIR } from "./paths.js";
+import { edgeSynth } from "./edgetts.js";
 
 const PORT = process.env.PORT || 3001;
 const GONG_FILE = join(DATA_DIR, "gong.bin");
 const ALARMFAX_DIR = join(DATA_DIR, "alarmfax");
 
-// Offline-Sprachsynthese mit Piper (https://github.com/rhasspy/piper)
-// Standardmaessig wird das ins Repo integrierte Piper unter server/vendor/piper
-// genutzt (per `npm run setup:piper` geladen). Ueberschreibbar via Umgebung:
-//   PIPER_BIN   = Pfad zur Piper-Executable
-//   PIPER_MODEL = Pfad zum Stimmmodell .onnx
-const DEFAULT_PIPER_BIN = join(PIPER_DIR, "piper", process.platform === "win32" ? "piper.exe" : "piper");
-const DEFAULT_PIPER_MODEL = join(PIPER_DIR, "de_DE-thorsten-medium.onnx");
-const PIPER_BIN = process.env.PIPER_BIN || (existsSync(DEFAULT_PIPER_BIN) ? DEFAULT_PIPER_BIN : "piper");
-const PIPER_MODEL = process.env.PIPER_MODEL || (existsSync(DEFAULT_PIPER_MODEL) ? DEFAULT_PIPER_MODEL : "");
-// Modell + Binary vorhanden? (schnelle Dateipruefung)
-const piperAvailable = () =>
-  !!PIPER_MODEL && existsSync(PIPER_MODEL) && (PIPER_BIN === "piper" || existsSync(PIPER_BIN));
+// Selbsttest der Edge-Sprachsynthese (gecacht)
+let edgeStatus = { tested: false, working: false, error: null };
 
-// Spawn-Optionen fuer Piper: Bibliothekspfad auf den Piper-Ordner setzen, damit
-// die mitgelieferten Libs (libespeak-ng, libonnxruntime …) ueber @rpath gefunden
-// werden – sonst "Library not loaded" beim Start aus anderem Arbeitsverzeichnis.
-function piperSpawnOpts() {
-  const libDir = dirname(PIPER_BIN);
-  const env = { ...process.env };
-  const prepend = (key) => { env[key] = libDir + (env[key] ? `:${env[key]}` : ""); };
-  if (process.platform === "darwin") {
-    prepend("DYLD_LIBRARY_PATH");
-    prepend("DYLD_FALLBACK_LIBRARY_PATH");
-  } else if (process.platform === "linux") {
-    prepend("LD_LIBRARY_PATH");
-  }
-  return { env, cwd: libDir };
+async function checkEdge() {
+  try { await edgeSynth("Test", state.settings?.tts?.edgeVoice); edgeStatus = { tested: true, working: true, error: null }; }
+  catch (e) { edgeStatus = { tested: true, working: false, error: e.message }; }
+  return edgeStatus;
 }
 
-// Ergebnis des Piper-Selbsttests (ob die Binary wirklich synthetisiert)
-let piperStatus = { tested: false, working: false, error: null };
-
-// Einmal echte Synthese probieren -> bestaetigt, dass Piper laeuft (nicht nur das Modell existiert)
-function runPiperTest() {
-  return new Promise((resolve) => {
-    if (!piperAvailable()) {
-      resolve({ working: false, error: "Piper-Binary oder Stimmmodell nicht gefunden" });
-      return;
-    }
-    const outFile = join(tmpdir(), `ffw-tts-test-${nanoid(6)}.wav`);
-    let stderr = "";
-    let done = false;
-    const finish = (working, error) => {
-      if (done) return;
-      done = true;
-      try { if (existsSync(outFile)) unlinkSync(outFile); } catch {}
-      resolve({ working, error });
-    };
-    let proc;
-    try {
-      proc = spawn(PIPER_BIN, ["--model", PIPER_MODEL, "--output_file", outFile], piperSpawnOpts());
-    } catch (e) {
-      finish(false, "Start fehlgeschlagen: " + e.message);
-      return;
-    }
-    const timer = setTimeout(() => { try { proc.kill(); } catch {} finish(false, "Zeitueberschreitung beim Test"); }, 10000);
-    proc.on("error", (e) => { clearTimeout(timer); finish(false, "Start fehlgeschlagen: " + e.message); });
-    proc.stderr.on("data", (d) => { stderr += d.toString(); });
-    proc.on("close", (code) => {
-      clearTimeout(timer);
-      if (code === 0 && existsSync(outFile)) finish(true, null);
-      else finish(false, `Piper beendet mit Code ${code}` + (stderr ? `: ${stderr.trim().slice(0, 200)}` : ""));
-    });
-    proc.stdin.on("error", () => {}); // EPIPE ignorieren, falls Prozess sofort abbricht
-    proc.stdin.write("Test");
-    proc.stdin.end();
-  });
-}
-
-async function checkPiper() {
-  const r = await runPiperTest();
-  piperStatus = { tested: true, working: r.working, error: r.error };
-  if (!r.working && piperAvailable()) console.warn("Piper-Selbsttest fehlgeschlagen:", r.error);
-  return piperStatus;
+// Wird die Server-Sprachsynthese (Edge) genutzt? (false = Browser-Stimme)
+function serverTtsActive() {
+  const e = state.settings?.tts?.engine || "auto";
+  if (e === "browser") return false;
+  return edgeStatus.working; // "auto" und "edge" nutzen Edge, sofern erreichbar
 }
 
 // Funkstatus-Bezeichnungen fuer das Einsatztagebuch
@@ -165,49 +104,39 @@ app.put("/api/settings/station", (req, res) => {
   res.json(state.settings.station);
 });
 
-// Status der Offline-Sprachsynthese (Piper) abfragen.
-// available = Dateien vorhanden, working = Selbsttest bestanden (Binary laeuft wirklich).
-// ?recheck=1 erzwingt einen erneuten Test (z. B. nach Quarantaene-Fix).
+// Status der Server-Sprachsynthese (Edge) abfragen.
+// working = liefert Edge Audio? ?recheck=1 erzwingt einen erneuten Test.
 app.get("/api/tts/status", async (req, res) => {
-  if (req.query.recheck || !piperStatus.tested) await checkPiper();
+  if (req.query.recheck || !edgeStatus.tested) await checkEdge();
   res.json({
-    available: piperAvailable(),
-    working: piperStatus.working,
-    error: piperStatus.error,
-    model: PIPER_MODEL ? basename(PIPER_MODEL) : null,
+    setting: state.settings?.tts?.engine || "auto",
+    working: serverTtsActive(),
+    edge: { working: edgeStatus.working, error: edgeStatus.error, voice: state.settings?.tts?.edgeVoice || "de-DE-ConradNeural" },
   });
 });
 
-// Text per Piper zu Sprache (WAV) synthetisieren
-app.get("/api/tts", (req, res) => {
+// Text per Edge TTS zu Sprache (MP3) synthetisieren
+app.get("/api/tts", async (req, res) => {
   const text = String(req.query.text || "").slice(0, 1000).trim();
   if (!text) return res.status(400).json({ error: "kein Text" });
-  if (!piperAvailable()) return res.status(503).json({ error: "Piper nicht konfiguriert" });
-
-  const outFile = join(tmpdir(), `ffw-tts-${nanoid(8)}.wav`);
-  const proc = spawn(PIPER_BIN, ["--model", PIPER_MODEL, "--output_file", outFile], piperSpawnOpts());
-  let stderr = "";
-  proc.stderr.on("data", (d) => { stderr += d.toString(); });
-  proc.on("error", (e) => {
-    if (!res.headersSent) res.status(500).json({ error: "Piper-Start fehlgeschlagen: " + e.message });
-  });
-  proc.on("close", (code) => {
-    if (code !== 0 || !existsSync(outFile)) {
-      if (!res.headersSent) res.status(500).json({ error: "Piper-Synthese fehlgeschlagen", detail: stderr.slice(0, 300) });
-      return;
-    }
-    res.setHeader("Content-Type", "audio/wav");
-    res.send(readFileSync(outFile));
-    try { unlinkSync(outFile); } catch {}
-  });
-  proc.stdin.write(text);
-  proc.stdin.end();
+  if (!serverTtsActive()) return res.status(503).json({ error: "Keine Server-Sprachsynthese aktiv" });
+  try {
+    const buf = await edgeSynth(text, state.settings?.tts?.edgeVoice);
+    res.setHeader("Content-Type", "audio/mpeg");
+    return res.send(buf);
+  } catch (e) {
+    return res.status(500).json({ error: "Synthese fehlgeschlagen: " + e.message });
+  }
 });
 
-// Sprachausgabe-Stimme (Name der gewuenschten TTS-Stimme) speichern
+// Sprachausgabe-Einstellungen speichern: { voice?, engine?, edgeVoice? }
 app.put("/api/settings/tts", (req, res) => {
-  const { voice } = req.body || {};
-  state.settings.tts = { voice: typeof voice === "string" ? voice : "" };
+  const t = state.settings.tts || (state.settings.tts = {});
+  const { voice, engine, edgeVoice } = req.body || {};
+  if (voice !== undefined) t.voice = typeof voice === "string" ? voice : "";
+  if (engine !== undefined) t.engine = ["auto", "edge", "browser"].includes(engine) ? engine : "auto";
+  if (edgeVoice !== undefined) t.edgeVoice = typeof edgeVoice === "string" && edgeVoice ? edgeVoice : "de-DE-ConradNeural";
+  edgeStatus = { tested: false, working: false, error: null }; // bei Aenderung neu testen (z. B. andere Stimme)
   persist();
   res.json(state.settings.tts);
 });
@@ -530,10 +459,8 @@ if (existsSync(PUBLIC_DIR)) {
   app.get("*", (req, res) => res.sendFile(join(PUBLIC_DIR, "index.html")));
 }
 
-// Piper beim Start einmal testen (Status ist dann sofort verfuegbar)
-checkPiper().then((s) => {
-  if (piperAvailable()) console.log(`Piper: ${s.working ? "einsatzbereit" : "NICHT lauffaehig (" + s.error + ")"}`);
-});
+// Edge-Sprachsynthese beim Start testen (Status ist dann sofort verfuegbar)
+checkEdge().then((s) => console.log(`Edge-TTS: ${s.working ? "einsatzbereit" : "nicht erreichbar (" + s.error + ")"}`));
 
 // "0.0.0.0" -> erreichbar von jedem Geraet im lokalen Netz
 app.listen(PORT, "0.0.0.0", () => {

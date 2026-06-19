@@ -43,7 +43,7 @@ export function cancelSpeech() {
   if (serverAudio) { serverAudio.pause(); serverAudio = null; }
 }
 
-// Ansage ueber die serverseitige (Piper-)Sprachsynthese abspielen.
+// Ansage ueber die serverseitige (Edge-)Sprachsynthese abspielen.
 // Promise wird abgelehnt, wenn der Server keine Audiodaten liefert.
 export function speakServer(text) {
   return new Promise((resolve, reject) => {

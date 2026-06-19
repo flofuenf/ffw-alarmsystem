@@ -158,6 +158,15 @@ function Standort({ station }) {
 }
 
 /* =========================== ALARMTON =========================== */
+const EDGE_VOICES = [
+  { id: "de-DE-ConradNeural", label: "Conrad (männlich)" },
+  { id: "de-DE-KillianNeural", label: "Killian (männlich)" },
+  { id: "de-DE-FlorianMultilingualNeural", label: "Florian (männlich)" },
+  { id: "de-DE-KatjaNeural", label: "Katja (weiblich)" },
+  { id: "de-DE-AmalaNeural", label: "Amala (weiblich)" },
+  { id: "de-DE-SeraphinaMultilingualNeural", label: "Seraphina (weiblich)" },
+];
+
 function Alarmton({ gong, tts }) {
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -176,15 +185,31 @@ function Alarmton({ gong, tts }) {
   }, []);
   useEffect(() => { setVoiceName(tts?.voice || ""); }, [tts?.voice]);
 
-  // Status der Offline-Sprachsynthese (Piper)
-  const [piper, setPiper] = useState(null);
-  useEffect(() => {
-    fetch("/api/tts/status").then((r) => r.json()).then(setPiper).catch(() => setPiper({ available: false }));
-  }, []);
-  function recheckPiper() {
-    setPiper(null);
-    fetch("/api/tts/status?recheck=1").then((r) => r.json()).then(setPiper).catch(() => setPiper({ available: false }));
+  // Engine + Edge-Stimme (aus den Einstellungen)
+  const [engine, setEngine] = useState(tts?.engine || "auto");
+  const [edgeVoice, setEdgeVoice] = useState(tts?.edgeVoice || "de-DE-ConradNeural");
+  useEffect(() => { setEngine(tts?.engine || "auto"); }, [tts?.engine]);
+  useEffect(() => { setEdgeVoice(tts?.edgeVoice || "de-DE-ConradNeural"); }, [tts?.edgeVoice]);
+
+  // Status der Server-Sprachsynthese
+  const [status, setStatus] = useState(null);
+  function loadStatus(recheck) {
+    setStatus(null);
+    fetch("/api/tts/status" + (recheck ? "?recheck=1" : "")).then((r) => r.json()).then(setStatus).catch(() => setStatus(null));
   }
+  useEffect(() => { loadStatus(false); }, []);
+
+  async function saveEngine(e) {
+    setEngine(e);
+    try { await api.updateTts({ engine: e }); } catch {}
+    loadStatus(true);
+  }
+  async function saveEdgeVoice(v) {
+    setEdgeVoice(v);
+    try { await api.updateTts({ edgeVoice: v }); } catch {}
+    loadStatus(true);
+  }
+  const testText = "Alarmeinsatz. Brand zwei. Musterstraße zwölf. Es fahren: Florian Musterstadt 1 44 1.";
 
   // Deutsche Stimmen zuerst anzeigen
   const voiceListe = [...voices].sort((a, b) => {
@@ -196,7 +221,7 @@ function Alarmton({ gong, tts }) {
   async function saveVoice() {
     setErr(null); setMsg(null);
     try {
-      await api.updateTts(voiceName);
+      await api.updateTts({ voice: voiceName });
       setMsg("Stimme gespeichert.");
     } catch (e) {
       setErr(e.message);
@@ -204,7 +229,7 @@ function Alarmton({ gong, tts }) {
   }
 
   function testVoice() {
-    speak("Brand zwei. Musterstraße zwölf. Es fahren: Florian Musterstadt 1 44 1.", voiceName);
+    speak(testText, voiceName);
   }
 
   async function upload(e) {
@@ -275,34 +300,52 @@ function Alarmton({ gong, tts }) {
         <hr className="sep" />
 
         <h2>Sprachansage</h2>
-        {piper?.working ? (
+        <label>
+          Engine
+          <select value={engine} onChange={(e) => saveEngine(e.target.value)}>
+            <option value="auto">Automatisch (Edge, sonst Browser)</option>
+            <option value="edge">Edge TTS (online, neuronal)</option>
+            <option value="browser">Nur Browser-Stimme</option>
+          </select>
+        </label>
+
+        {(engine === "edge" || engine === "auto") && (
+          <label>
+            Edge-Stimme
+            <select value={edgeVoice} onChange={(e) => saveEdgeVoice(e.target.value)}>
+              {EDGE_VOICES.map((v) => (
+                <option key={v.id} value={v.id}>{v.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {/* Statusanzeige */}
+        {!status ? (
+          <p className="muted small">Status wird geprüft…</p>
+        ) : status.working ? (
           <p className="muted small">
-            ✅ <strong>Offline-Sprachsynthese (Piper)</strong> aktiv – Stimme <code>{piper.model}</code>. Der Alarmmonitor liest den Einsatz damit vor. Die Browser-Stimme unten dient nur als Rückfall.
-          </p>
-        ) : piper?.available ? (
-          <p className="error small">
-            ⚠ Piper ist installiert, lässt sich aber <strong>nicht ausführen</strong>{piper.error ? `: ${piper.error}` : ""}. Es wird die Browser-Stimme verwendet. Auf macOS ggf. Quarantäne/Ausführrechte setzen – siehe README („Fehlersuche").
+            ✅ Aktiv: <strong>Edge TTS (online)</strong> · {edgeVoice}. Der Alarmmonitor liest den Einsatz damit vor.
           </p>
         ) : (
           <p className="muted small">
-            ℹ️ Piper (Offline-Sprachsynthese) ist nicht konfiguriert – es wird die <strong>Browser-Stimme</strong> verwendet. Einrichtung: siehe README (PIPER_BIN / PIPER_MODEL).
+            ℹ️ Keine Server-Stimme aktiv – es wird die <strong>Browser-Stimme</strong> genutzt.
           </p>
         )}
+        {status && engine !== "browser" && status.edge && !status.edge.working && (
+          <p className="error small">Edge nicht erreichbar{status.edge.error ? `: ${status.edge.error}` : ""} (Internet nötig).</p>
+        )}
+
         <div className="form-actions" style={{ marginBottom: 12 }}>
-          {piper?.working && (
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => speakServer("Brand zwei. Musterstraße zwölf. Es fahren: Florian Musterstadt 1 44 1.").catch(() => {})}
-            >
-              ▶ Piper-Ansage testen
-            </button>
-          )}
-          {piper?.available && (
-            <button type="button" className="btn-ghost" onClick={recheckPiper}>
-              ↻ Piper erneut prüfen
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={!status?.working}
+            onClick={() => speakServer(testText).catch(() => {})}
+          >
+            ▶ Server-Ansage testen
+          </button>
+          <button type="button" className="btn-ghost" onClick={() => loadStatus(true)}>↻ Status prüfen</button>
         </div>
 
         <label>

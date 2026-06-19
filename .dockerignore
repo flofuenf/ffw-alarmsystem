@@ -6,7 +6,6 @@ dist
 build
 client/dist
 server/data
-server/vendor
 *.log
 .DS_Store
 .idea

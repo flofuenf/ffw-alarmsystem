@@ -38,8 +38,8 @@ export const api = {
   },
   deleteGong: () => req("/settings/gong", { method: "DELETE" }),
 
-  // Sprachausgabe-Stimme
-  updateTts: (voice) => req("/settings/tts", { method: "PUT", body: JSON.stringify({ voice }) }),
+  // Sprachausgabe-Einstellungen ({ voice?, engine?, edgeVoice? })
+  updateTts: (patch) => req("/settings/tts", { method: "PUT", body: JSON.stringify(patch) }),
 
   // Fahrzeuge
   getVehicles: () => req("/vehicles"),

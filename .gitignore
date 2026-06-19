@@ -4,7 +4,6 @@ build/
 server/data/db.json
 server/data/gong.bin
 server/data/alarmfax/
-server/vendor/
 .env
 .DS_Store
 .idea

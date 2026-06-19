@@ -99,63 +99,25 @@ Im Reiter **Einsätze**: Stichwort, Adresse (Button „Auf Karte suchen" ermitte
 - **Aktiver Alarm:** Stichwort, Adresse, Laufzeit, disponierte Fahrzeuge und der Einsatzort auf der Karte. Mehrere gleichzeitige Einsätze werden unterstützt.
 - **Akustischer Alarm:** Bei einer (Nach-)Alarmierung ertönt ein Gong, danach wird der Einsatz vorgelesen (Stichwort, Straße + Hausnummer, disponierte Fahrzeuge). Browser blockieren Ton bis zur ersten Interaktion – den Monitor einmal anklicken bzw. auf 🔔 tippen. Im Reiter **Alarmton** lässt sich eine eigene Gong-Datei hochladen und die Stimme wählen.
 
-## Sprachansage mit Piper (offline, natürlichere Stimme)
+## Sprachansage
 
-Standardmäßig nutzt der Monitor die Browser-Sprachausgabe. Für eine natürlicher klingende, **männliche** Stimme ohne Cloud nutzt der Server [Piper](https://github.com/rhasspy/piper). Binary und Stimmmodell werden mit einem Befehl ins Projekt geladen:
+Der Alarmmonitor liest Einsätze vor. Die Stimme lässt sich im Reiter **Alarmton** über die **Engine** wählen:
 
-```bash
-npm run setup:piper
-```
+| Engine | Beschreibung |
+|--------|--------------|
+| **Automatisch** (Standard) | nutzt Edge TTS, falls erreichbar; sonst die Browser-Stimme |
+| **Edge TTS (online)** | neuronale Microsoft-Stimmen, kostenlos, **ohne API-Key**, sehr natürlich (z. B. Conrad/Killian, männlich). Läuft serverseitig, braucht Internet. |
+| **Nur Browser-Stimme** | die im jeweiligen Browser/Gerät installierte Stimme. |
 
-Das lädt die zur Plattform passende Piper-Binary und das deutsche Modell `de_DE-thorsten-medium` (~63 MB) nach `server/vendor/piper/`. Danach erkennt der Server Piper automatisch – einfach neu starten (`npm run dev` bzw. `npm start`). Im Reiter **Alarmton** wird der Status angezeigt („Offline-Sprachsynthese (Piper) aktiv"), und der Alarmmonitor liest den Einsatz mit dieser Stimme vor.
+**Edge TTS** ist die einfachste hochwertige Option – keine Einrichtung, läuft serverseitig auf allen Geräten gleich, funktioniert auch auf macOS. Die gewünschte Edge-Stimme wird im Reiter **Alarmton** ausgewählt. Ist Edge nicht erreichbar (kein Internet), fällt der Monitor automatisch auf die im Alarmton gewählte **Browser-Stimme** zurück.
 
-Eigene Pfade/Stimme lassen sich per Umgebungsvariablen überschreiben:
+### Natürliche Browser-Stimme (ohne Internet)
 
-```bash
-# Windows (PowerShell)
-$env:PIPER_BIN = "C:\pfad\piper.exe"; $env:PIPER_MODEL = "C:\pfad\stimme.onnx"; npm start
-# Linux/macOS
-PIPER_BIN=/opt/piper/piper PIPER_MODEL=/opt/piper/stimme.onnx npm start
-```
+Ohne Internet (kein Edge TTS) lohnt sich auf den Endgeräten eine hochwertige System-Stimme:
+- **macOS:** Systemeinstellungen → Bedienungshilfen → Gesprochene Inhalte → Systemstimme → Stimme verwalten → unter **Deutsch** eine **Premium**-Stimme laden (z. B. **Markus (Premium)**, männlich).
+- **Windows:** in Edge stehen deutsche **„(Natural)"**-Stimmen zur Verfügung (Conrad/Killian).
 
-Ist Piper nicht eingerichtet, dient die im Reiter **Alarmton** gewählte Browser-Stimme als Rückfall.
-
-> **macOS:** Die offiziellen Piper-Releases von rhasspy (`2023.11.14-2`) sind auf macOS **defekt** – sie liefern die Binary, aber **nicht** die nötigen Bibliotheken (`libespeak-ng.1.dylib` u. a.) mit. Piper startet dort daher nicht (`Library not loaded: @rpath/libespeak-ng.1.dylib`). Empfehlung auf dem Mac: **Piper nicht verwenden**, sondern eine hochwertige deutsche **System-Stimme** über die Browser-Sprachausgabe nutzen (siehe unten).
-
-#### Natürliche Stimme auf macOS (ohne Piper)
-
-macOS bietet sehr natürliche, ladbare Premium-Stimmen, die die Browser-Sprachausgabe direkt nutzen kann:
-
-1. **Systemeinstellungen → Bedienungshilfen → Gesprochene Inhalte → Systemstimme → Stimme verwalten**
-2. Unter **Deutsch** eine **Premium**-Stimme laden, z. B. **Markus (Premium)** (männlich) oder **Anna (Premium)**.
-3. Im Reiter **Alarmton** diese Stimme als „Browser-Stimme" auswählen.
-
-Damit klingt die Ansage auf dem Mac sehr natürlich – ganz ohne Piper.
-
-### Fehlersuche: „Piper aktiv", aber es wird die Browser-Stimme genutzt
-
-Die Statusanzeige prüft nur, ob das **Stimm-Modell** (`.onnx`) vorhanden ist – **nicht**, ob die Piper-Binary tatsächlich läuft. Lässt sich die Binary nicht ausführen, fällt der Monitor still auf die Browser-Stimme zurück, während weiterhin „aktiv" angezeigt wird. Das passiert häufig auf **macOS** (unsignierte Binary → Gatekeeper) oder bei fehlenden Ausführrechten.
-
-So findest du die Ursache:
-
-1. **Endpoint direkt testen** im Browser: `http://localhost:3001/api/tts?text=Hallo`
-   - WAV kommt → Piper läuft. Fehler-JSON → Piper startet nicht.
-2. **Server-Log** ansehen – bei einem Alarm erscheint dort sonst `Piper-Start fehlgeschlagen…` bzw. `Piper-Synthese fehlgeschlagen…`.
-3. **Piper von Hand starten** (zeigt die genaue Meldung des Betriebssystems):
-   ```bash
-   # macOS/Linux
-   echo "Test" | ./server/vendor/piper/piper/piper \
-     --model ./server/vendor/piper/de_DE-thorsten-medium.onnx --output_file /tmp/t.wav
-   ```
-
-Typische Fixes auf **macOS** (Quarantäne entfernen + Ausführrechte):
-```bash
-xattr -dr com.apple.quarantine server/vendor/piper
-chmod +x server/vendor/piper/piper/piper
-```
-Falls Gatekeeper weiterhin blockiert: Systemeinstellungen → Datenschutz & Sicherheit → nach dem ersten Versuch „Dennoch erlauben". Zeigt der Handstart „No such file", lief der Binary-Download bei `npm run setup:piper` ins Leere → erneut ausführen.
-
-**`Library not loaded: @rpath/libespeak-ng.1.dylib`** auf **macOS**: Ursache ist das oben genannte defekte Piper-Release – die `*.dylib`-Bibliotheken fehlen im Archiv, also kann auch kein Bibliothekspfad/`xattr` helfen. Lösung: auf dem Mac die **Browser-Sprachausgabe mit einer Premium-System-Stimme** verwenden (siehe „Natürliche Stimme auf macOS"). Auf **Linux** mit demselben Fehler (`LD_LIBRARY_PATH`) sind die Libs vorhanden – der Server setzt den Pfad automatisch; hier hilft ein Neustart + „↻ Piper erneut prüfen".
+Im Reiter **Alarmton** unter „Browser-Stimme" auswählen.
 
 ## Standalone-Build (.exe – ohne Node/npm starten)
 
@@ -170,7 +132,7 @@ Ergebnis: **`dist/alarmsystem-win.exe`** (~70 MB). Einfach starten (Doppelklick 
 **Wichtig / gut zu wissen:**
 - **Daten** werden in einem Ordner `data/` **neben der `.exe`** abgelegt (wird beim ersten Start angelegt) – einfach mitkopieren/sichern.
 - **Google-Maps-Key:** Der Schlüssel wird **beim Bauen** aus `client/.env` ins Frontend übernommen. Also vor `npm run dist` den Key in `client/.env` eintragen, sonst ist in der `.exe` keiner enthalten.
-- **Piper-Sprachausgabe (optional):** den Ordner `server/vendor/piper` neben die `.exe` nach `dist/vendor/piper` kopieren. Ohne Piper nutzt die Ansage die Browser-Stimme.
+- **Sprachansage:** Edge TTS funktioniert direkt (Internet vorausgesetzt); sonst greift die Browser-Stimme.
 - **Port ändern:** `PORT`-Umgebungsvariable setzen, z. B. (PowerShell) `$env:PORT=8080; .\alarmsystem-win.exe`.
 
 ### Für macOS / Linux bauen
@@ -216,7 +178,7 @@ Danach erreichbar unter <http://localhost:3001> bzw. `http://<host-ip>:3001/moni
   ```
   Alternativ vor dem Build den Key in `client/.env` eintragen.
 - **Port ändern:** `-e PORT=8080 -p 8080:8080`.
-- **Piper-Sprachausgabe (optional):** den passenden Linux-Piper-Ordner als Volume einhängen: `-v /pfad/piper:/app/server/vendor/piper`. Ohne Piper nutzt die Ansage die Browser-Stimme.
+- **Sprachansage:** Edge TTS läuft im Container direkt (Internet vorausgesetzt); sonst Browser-Stimme.
 
 ### Mit Docker Compose
 
@@ -235,7 +197,7 @@ VITE_GOOGLE_MAPS_API_KEY=DEIN_SCHLUESSEL
 PORT=3001
 ```
 
-Die Daten liegen im benannten Volume `ffw-data`. Für Piper die entsprechende Zeile in [docker-compose.yml](docker-compose.yml) einkommentieren.
+Die Daten liegen im benannten Volume `ffw-data`.
 
 ## Funkstatus (FMS)
 

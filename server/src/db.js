@@ -10,7 +10,7 @@ const DEFAULT_DATA = {
   settings: {
     station: { name: "", adresse: "", lat: null, lng: null },
     gong: { hasCustom: false, mime: null, updatedAt: null },
-    tts: { voice: "" },
+    tts: { voice: "", engine: "auto", edgeVoice: "de-DE-ConradNeural" },
   },
 };
 

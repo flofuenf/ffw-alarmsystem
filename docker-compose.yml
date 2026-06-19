@@ -14,8 +14,6 @@ services:
       - PORT=3001
     volumes:
       - ffw-data:/app/server/data
-      # Optional: Piper-Sprachausgabe (passenden Linux-Piper-Ordner einhängen)
-      # - ./piper:/app/server/vendor/piper:ro
     restart: unless-stopped
 
 volumes:

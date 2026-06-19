@@ -14,6 +14,3 @@ export const DATA_DIR = packaged ? join(exeDir, "data") : join(here, "..", "data
 
 // Statisches Frontend: im Paket eingebettet (build/public), sonst client/dist
 export const PUBLIC_DIR = packaged ? join(here, "public") : join(here, "..", "..", "client", "dist");
-
-// Piper-Sprachsynthese: im Paket neben der .exe (vendor/piper), sonst server/vendor/piper
-export const PIPER_DIR = packaged ? join(exeDir, "vendor", "piper") : join(here, "..", "vendor", "piper");
