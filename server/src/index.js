@@ -27,6 +27,22 @@ const PIPER_MODEL = process.env.PIPER_MODEL || (existsSync(DEFAULT_PIPER_MODEL) 
 const piperAvailable = () =>
   !!PIPER_MODEL && existsSync(PIPER_MODEL) && (PIPER_BIN === "piper" || existsSync(PIPER_BIN));
 
+// Spawn-Optionen fuer Piper: Bibliothekspfad auf den Piper-Ordner setzen, damit
+// die mitgelieferten Libs (libespeak-ng, libonnxruntime …) ueber @rpath gefunden
+// werden – sonst "Library not loaded" beim Start aus anderem Arbeitsverzeichnis.
+function piperSpawnOpts() {
+  const libDir = dirname(PIPER_BIN);
+  const env = { ...process.env };
+  const prepend = (key) => { env[key] = libDir + (env[key] ? `:${env[key]}` : ""); };
+  if (process.platform === "darwin") {
+    prepend("DYLD_LIBRARY_PATH");
+    prepend("DYLD_FALLBACK_LIBRARY_PATH");
+  } else if (process.platform === "linux") {
+    prepend("LD_LIBRARY_PATH");
+  }
+  return { env, cwd: libDir };
+}
+
 // Ergebnis des Piper-Selbsttests (ob die Binary wirklich synthetisiert)
 let piperStatus = { tested: false, working: false, error: null };
 
@@ -48,7 +64,7 @@ function runPiperTest() {
     };
     let proc;
     try {
-      proc = spawn(PIPER_BIN, ["--model", PIPER_MODEL, "--output_file", outFile]);
+      proc = spawn(PIPER_BIN, ["--model", PIPER_MODEL, "--output_file", outFile], piperSpawnOpts());
     } catch (e) {
       finish(false, "Start fehlgeschlagen: " + e.message);
       return;
@@ -169,7 +185,7 @@ app.get("/api/tts", (req, res) => {
   if (!piperAvailable()) return res.status(503).json({ error: "Piper nicht konfiguriert" });
 
   const outFile = join(tmpdir(), `ffw-tts-${nanoid(8)}.wav`);
-  const proc = spawn(PIPER_BIN, ["--model", PIPER_MODEL, "--output_file", outFile]);
+  const proc = spawn(PIPER_BIN, ["--model", PIPER_MODEL, "--output_file", outFile], piperSpawnOpts());
   let stderr = "";
   proc.stderr.on("data", (d) => { stderr += d.toString(); });
   proc.on("error", (e) => {

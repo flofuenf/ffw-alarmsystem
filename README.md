@@ -143,6 +143,8 @@ chmod +x server/vendor/piper/piper/piper
 ```
 Falls Gatekeeper weiterhin blockiert: Systemeinstellungen → Datenschutz & Sicherheit → nach dem ersten Versuch „Dennoch erlauben". Zeigt der Handstart „No such file", lief der Binary-Download bei `npm run setup:piper` ins Leere → erneut ausführen.
 
+**`Library not loaded: @rpath/libespeak-ng.1.dylib`** (o. ä.): Die Piper-Binary findet ihre mitgelieferten Bibliotheken nicht. Der Server setzt den Bibliothekspfad (`DYLD_FALLBACK_LIBRARY_PATH` bzw. `LD_LIBRARY_PATH`) beim Start von Piper inzwischen automatisch – **Server neu starten** und im Reiter **Alarmton** auf „↻ Piper erneut prüfen" klicken. Bleibt der Fehler oder kommt stattdessen eine Signatur-/Quarantäne-Meldung: `xattr -dr com.apple.quarantine server/vendor/piper`.
+
 ## Standalone-Build (.exe – ohne Node/npm starten)
 
 Die gesamte App lässt sich in **eine eigenständige Windows-`.exe`** packen (Node-Runtime, Backend und gebautes Frontend sind enthalten). Auf dem Zielrechner muss **nichts** installiert sein.
