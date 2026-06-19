@@ -30,7 +30,7 @@ export default function Monitor() {
   useEffect(() => {
     fetch("/api/tts/status")
       .then((r) => r.json())
-      .then((s) => { serverTtsRef.current = !!s.available; })
+      .then((s) => { serverTtsRef.current = !!s.working; })
       .catch(() => { serverTtsRef.current = false; });
   }, []);
 

@@ -23,7 +23,56 @@ const DEFAULT_PIPER_BIN = join(PIPER_DIR, "piper", process.platform === "win32" 
 const DEFAULT_PIPER_MODEL = join(PIPER_DIR, "de_DE-thorsten-medium.onnx");
 const PIPER_BIN = process.env.PIPER_BIN || (existsSync(DEFAULT_PIPER_BIN) ? DEFAULT_PIPER_BIN : "piper");
 const PIPER_MODEL = process.env.PIPER_MODEL || (existsSync(DEFAULT_PIPER_MODEL) ? DEFAULT_PIPER_MODEL : "");
-const piperAvailable = () => !!PIPER_MODEL && existsSync(PIPER_MODEL);
+// Modell + Binary vorhanden? (schnelle Dateipruefung)
+const piperAvailable = () =>
+  !!PIPER_MODEL && existsSync(PIPER_MODEL) && (PIPER_BIN === "piper" || existsSync(PIPER_BIN));
+
+// Ergebnis des Piper-Selbsttests (ob die Binary wirklich synthetisiert)
+let piperStatus = { tested: false, working: false, error: null };
+
+// Einmal echte Synthese probieren -> bestaetigt, dass Piper laeuft (nicht nur das Modell existiert)
+function runPiperTest() {
+  return new Promise((resolve) => {
+    if (!piperAvailable()) {
+      resolve({ working: false, error: "Piper-Binary oder Stimmmodell nicht gefunden" });
+      return;
+    }
+    const outFile = join(tmpdir(), `ffw-tts-test-${nanoid(6)}.wav`);
+    let stderr = "";
+    let done = false;
+    const finish = (working, error) => {
+      if (done) return;
+      done = true;
+      try { if (existsSync(outFile)) unlinkSync(outFile); } catch {}
+      resolve({ working, error });
+    };
+    let proc;
+    try {
+      proc = spawn(PIPER_BIN, ["--model", PIPER_MODEL, "--output_file", outFile]);
+    } catch (e) {
+      finish(false, "Start fehlgeschlagen: " + e.message);
+      return;
+    }
+    const timer = setTimeout(() => { try { proc.kill(); } catch {} finish(false, "Zeitueberschreitung beim Test"); }, 10000);
+    proc.on("error", (e) => { clearTimeout(timer); finish(false, "Start fehlgeschlagen: " + e.message); });
+    proc.stderr.on("data", (d) => { stderr += d.toString(); });
+    proc.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0 && existsSync(outFile)) finish(true, null);
+      else finish(false, `Piper beendet mit Code ${code}` + (stderr ? `: ${stderr.trim().slice(0, 200)}` : ""));
+    });
+    proc.stdin.on("error", () => {}); // EPIPE ignorieren, falls Prozess sofort abbricht
+    proc.stdin.write("Test");
+    proc.stdin.end();
+  });
+}
+
+async function checkPiper() {
+  const r = await runPiperTest();
+  piperStatus = { tested: true, working: r.working, error: r.error };
+  if (!r.working && piperAvailable()) console.warn("Piper-Selbsttest fehlgeschlagen:", r.error);
+  return piperStatus;
+}
 
 // Funkstatus-Bezeichnungen fuer das Einsatztagebuch
 const FMS_LABEL = { 1: "Einsatzbereit (Funk)", 2: "Einsatzbereit (Wache)", 3: "Anfahrt", 4: "Am Einsatzort", 5: "Sprechwunsch", 6: "Nicht einsatzbereit" };
@@ -100,9 +149,17 @@ app.put("/api/settings/station", (req, res) => {
   res.json(state.settings.station);
 });
 
-// Status der Offline-Sprachsynthese (Piper) abfragen
-app.get("/api/tts/status", (req, res) => {
-  res.json({ available: piperAvailable(), model: PIPER_MODEL ? basename(PIPER_MODEL) : null });
+// Status der Offline-Sprachsynthese (Piper) abfragen.
+// available = Dateien vorhanden, working = Selbsttest bestanden (Binary laeuft wirklich).
+// ?recheck=1 erzwingt einen erneuten Test (z. B. nach Quarantaene-Fix).
+app.get("/api/tts/status", async (req, res) => {
+  if (req.query.recheck || !piperStatus.tested) await checkPiper();
+  res.json({
+    available: piperAvailable(),
+    working: piperStatus.working,
+    error: piperStatus.error,
+    model: PIPER_MODEL ? basename(PIPER_MODEL) : null,
+  });
 });
 
 // Text per Piper zu Sprache (WAV) synthetisieren
@@ -456,6 +513,11 @@ if (existsSync(PUBLIC_DIR)) {
   app.use(express.static(PUBLIC_DIR));
   app.get("*", (req, res) => res.sendFile(join(PUBLIC_DIR, "index.html")));
 }
+
+// Piper beim Start einmal testen (Status ist dann sofort verfuegbar)
+checkPiper().then((s) => {
+  if (piperAvailable()) console.log(`Piper: ${s.working ? "einsatzbereit" : "NICHT lauffaehig (" + s.error + ")"}`);
+});
 
 // "0.0.0.0" -> erreichbar von jedem Geraet im lokalen Netz
 app.listen(PORT, "0.0.0.0", () => {

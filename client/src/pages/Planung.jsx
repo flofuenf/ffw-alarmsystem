@@ -181,6 +181,10 @@ function Alarmton({ gong, tts }) {
   useEffect(() => {
     fetch("/api/tts/status").then((r) => r.json()).then(setPiper).catch(() => setPiper({ available: false }));
   }, []);
+  function recheckPiper() {
+    setPiper(null);
+    fetch("/api/tts/status?recheck=1").then((r) => r.json()).then(setPiper).catch(() => setPiper({ available: false }));
+  }
 
   // Deutsche Stimmen zuerst anzeigen
   const voiceListe = [...voices].sort((a, b) => {
@@ -271,17 +275,21 @@ function Alarmton({ gong, tts }) {
         <hr className="sep" />
 
         <h2>Sprachansage</h2>
-        {piper?.available ? (
+        {piper?.working ? (
           <p className="muted small">
-            ✅ <strong>Offline-Sprachsynthese (Piper)</strong> aktiv – Stimme <code>{piper.model}</code>. Der Alarmmonitor liest den Einsatz damit vor. Die Browser-Stimme unten dient nur als Rückfall, falls Piper auf dem Monitor nicht erreichbar ist.
+            ✅ <strong>Offline-Sprachsynthese (Piper)</strong> aktiv – Stimme <code>{piper.model}</code>. Der Alarmmonitor liest den Einsatz damit vor. Die Browser-Stimme unten dient nur als Rückfall.
+          </p>
+        ) : piper?.available ? (
+          <p className="error small">
+            ⚠ Piper ist installiert, lässt sich aber <strong>nicht ausführen</strong>{piper.error ? `: ${piper.error}` : ""}. Es wird die Browser-Stimme verwendet. Auf macOS ggf. Quarantäne/Ausführrechte setzen – siehe README („Fehlersuche").
           </p>
         ) : (
           <p className="muted small">
             ℹ️ Piper (Offline-Sprachsynthese) ist nicht konfiguriert – es wird die <strong>Browser-Stimme</strong> verwendet. Einrichtung: siehe README (PIPER_BIN / PIPER_MODEL).
           </p>
         )}
-        {piper?.available && (
-          <div className="form-actions" style={{ marginBottom: 12 }}>
+        <div className="form-actions" style={{ marginBottom: 12 }}>
+          {piper?.working && (
             <button
               type="button"
               className="btn-primary"
@@ -289,8 +297,13 @@ function Alarmton({ gong, tts }) {
             >
               ▶ Piper-Ansage testen
             </button>
-          </div>
-        )}
+          )}
+          {piper?.available && (
+            <button type="button" className="btn-ghost" onClick={recheckPiper}>
+              ↻ Piper erneut prüfen
+            </button>
+          )}
+        </div>
 
         <label>
           Browser-Stimme (Rückfall)
