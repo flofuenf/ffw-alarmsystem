@@ -120,6 +120,29 @@ PIPER_BIN=/opt/piper/piper PIPER_MODEL=/opt/piper/stimme.onnx npm start
 
 Ist Piper nicht eingerichtet, dient die im Reiter **Alarmton** gewählte Browser-Stimme als Rückfall.
 
+### Fehlersuche: „Piper aktiv", aber es wird die Browser-Stimme genutzt
+
+Die Statusanzeige prüft nur, ob das **Stimm-Modell** (`.onnx`) vorhanden ist – **nicht**, ob die Piper-Binary tatsächlich läuft. Lässt sich die Binary nicht ausführen, fällt der Monitor still auf die Browser-Stimme zurück, während weiterhin „aktiv" angezeigt wird. Das passiert häufig auf **macOS** (unsignierte Binary → Gatekeeper) oder bei fehlenden Ausführrechten.
+
+So findest du die Ursache:
+
+1. **Endpoint direkt testen** im Browser: `http://localhost:3001/api/tts?text=Hallo`
+   - WAV kommt → Piper läuft. Fehler-JSON → Piper startet nicht.
+2. **Server-Log** ansehen – bei einem Alarm erscheint dort sonst `Piper-Start fehlgeschlagen…` bzw. `Piper-Synthese fehlgeschlagen…`.
+3. **Piper von Hand starten** (zeigt die genaue Meldung des Betriebssystems):
+   ```bash
+   # macOS/Linux
+   echo "Test" | ./server/vendor/piper/piper/piper \
+     --model ./server/vendor/piper/de_DE-thorsten-medium.onnx --output_file /tmp/t.wav
+   ```
+
+Typische Fixes auf **macOS** (Quarantäne entfernen + Ausführrechte):
+```bash
+xattr -dr com.apple.quarantine server/vendor/piper
+chmod +x server/vendor/piper/piper/piper
+```
+Falls Gatekeeper weiterhin blockiert: Systemeinstellungen → Datenschutz & Sicherheit → nach dem ersten Versuch „Dennoch erlauben". Zeigt der Handstart „No such file", lief der Binary-Download bei `npm run setup:piper` ins Leere → erneut ausführen.
+
 ## Standalone-Build (.exe – ohne Node/npm starten)
 
 Die gesamte App lässt sich in **eine eigenständige Windows-`.exe`** packen (Node-Runtime, Backend und gebautes Frontend sind enthalten). Auf dem Zielrechner muss **nichts** installiert sein.
