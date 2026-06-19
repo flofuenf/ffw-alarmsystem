@@ -120,6 +120,18 @@ PIPER_BIN=/opt/piper/piper PIPER_MODEL=/opt/piper/stimme.onnx npm start
 
 Ist Piper nicht eingerichtet, dient die im Reiter **Alarmton** gewählte Browser-Stimme als Rückfall.
 
+> **macOS:** Die offiziellen Piper-Releases von rhasspy (`2023.11.14-2`) sind auf macOS **defekt** – sie liefern die Binary, aber **nicht** die nötigen Bibliotheken (`libespeak-ng.1.dylib` u. a.) mit. Piper startet dort daher nicht (`Library not loaded: @rpath/libespeak-ng.1.dylib`). Empfehlung auf dem Mac: **Piper nicht verwenden**, sondern eine hochwertige deutsche **System-Stimme** über die Browser-Sprachausgabe nutzen (siehe unten).
+
+#### Natürliche Stimme auf macOS (ohne Piper)
+
+macOS bietet sehr natürliche, ladbare Premium-Stimmen, die die Browser-Sprachausgabe direkt nutzen kann:
+
+1. **Systemeinstellungen → Bedienungshilfen → Gesprochene Inhalte → Systemstimme → Stimme verwalten**
+2. Unter **Deutsch** eine **Premium**-Stimme laden, z. B. **Markus (Premium)** (männlich) oder **Anna (Premium)**.
+3. Im Reiter **Alarmton** diese Stimme als „Browser-Stimme" auswählen.
+
+Damit klingt die Ansage auf dem Mac sehr natürlich – ganz ohne Piper.
+
 ### Fehlersuche: „Piper aktiv", aber es wird die Browser-Stimme genutzt
 
 Die Statusanzeige prüft nur, ob das **Stimm-Modell** (`.onnx`) vorhanden ist – **nicht**, ob die Piper-Binary tatsächlich läuft. Lässt sich die Binary nicht ausführen, fällt der Monitor still auf die Browser-Stimme zurück, während weiterhin „aktiv" angezeigt wird. Das passiert häufig auf **macOS** (unsignierte Binary → Gatekeeper) oder bei fehlenden Ausführrechten.
@@ -143,7 +155,7 @@ chmod +x server/vendor/piper/piper/piper
 ```
 Falls Gatekeeper weiterhin blockiert: Systemeinstellungen → Datenschutz & Sicherheit → nach dem ersten Versuch „Dennoch erlauben". Zeigt der Handstart „No such file", lief der Binary-Download bei `npm run setup:piper` ins Leere → erneut ausführen.
 
-**`Library not loaded: @rpath/libespeak-ng.1.dylib`** (o. ä.): Die Piper-Binary findet ihre mitgelieferten Bibliotheken nicht. Der Server setzt den Bibliothekspfad (`DYLD_FALLBACK_LIBRARY_PATH` bzw. `LD_LIBRARY_PATH`) beim Start von Piper inzwischen automatisch – **Server neu starten** und im Reiter **Alarmton** auf „↻ Piper erneut prüfen" klicken. Bleibt der Fehler oder kommt stattdessen eine Signatur-/Quarantäne-Meldung: `xattr -dr com.apple.quarantine server/vendor/piper`.
+**`Library not loaded: @rpath/libespeak-ng.1.dylib`** auf **macOS**: Ursache ist das oben genannte defekte Piper-Release – die `*.dylib`-Bibliotheken fehlen im Archiv, also kann auch kein Bibliothekspfad/`xattr` helfen. Lösung: auf dem Mac die **Browser-Sprachausgabe mit einer Premium-System-Stimme** verwenden (siehe „Natürliche Stimme auf macOS"). Auf **Linux** mit demselben Fehler (`LD_LIBRARY_PATH`) sind die Libs vorhanden – der Server setzt den Pfad automatisch; hier hilft ein Neustart + „↻ Piper erneut prüfen".
 
 ## Standalone-Build (.exe – ohne Node/npm starten)
 

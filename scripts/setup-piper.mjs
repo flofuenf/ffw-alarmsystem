@@ -72,6 +72,15 @@ async function main() {
     console.log("✓ Stimmmodell:", modelPath);
   }
 
+  // macOS-Warnung: die rhasspy-Releases (2023.11.14-2) liefern KEINE *.dylib mit ->
+  // Piper laesst sich auf dem Mac nicht starten ("Library not loaded: @rpath/libespeak-ng.1.dylib").
+  if (process.platform === "darwin" && !existsSync(join(dirname(binPath), "libespeak-ng.1.dylib"))) {
+    console.warn("\n⚠  ACHTUNG (macOS): Das Piper-Release enthaelt keine Bibliotheken (libespeak-ng …).");
+    console.warn("   Piper kann damit NICHT starten. Auf dem Mac empfiehlt sich stattdessen eine");
+    console.warn("   hochwertige System-Stimme ueber die Browser-Sprachausgabe – siehe README.");
+    return;
+  }
+
   console.log("\nFertig. Der Server nutzt Piper jetzt automatisch (server/vendor/piper).");
 }
 
