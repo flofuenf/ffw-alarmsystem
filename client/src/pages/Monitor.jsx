@@ -13,11 +13,23 @@ export default function Monitor() {
   const station = settings?.station || null;
   const [now, setNow] = useState(new Date());
   const [muted, setMuted] = useState(false);
+  const [audioReady, setAudioReady] = useState(false);
   const alarmSigRef = useRef(null);
   const serverTtsRef = useRef(false);
   const repeatTimerRef = useRef(null);
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
+  const audioReadyRef = useRef(audioReady);
+  audioReadyRef.current = audioReady;
+
+  // Tonausgabe nach einer Nutzerinteraktion freischalten. Erst danach werden
+  // Gong/Ansagen abgespielt – so kann der Browser nichts "aufstauen" und spaeter
+  // gebuendelt nachholen (Gong + letzte Meldung beim Stumm/Laut-Schalten).
+  function enableAudio() {
+    unlockAudio();
+    cancelSpeech(); // evtl. vom Browser zurueckgehaltene Ansage verwerfen
+    setAudioReady(true);
+  }
 
   // Ansage abspielen – bevorzugt Server-Stimme (Edge), sonst Browser-Stimme.
   // Promise wird aufgeloest, wenn die Ansage beendet ist.
@@ -39,9 +51,9 @@ export default function Monitor() {
     return () => clearInterval(t);
   }, []);
 
-  // AudioContext bei der ersten Nutzerinteraktion freischalten (Autoplay-Sperre)
+  // Tonausgabe bei der ersten Nutzerinteraktion freischalten (Autoplay-Sperre)
   useEffect(() => {
-    const h = () => unlockAudio();
+    const h = () => enableAudio();
     window.addEventListener("pointerdown", h, { once: true });
     return () => window.removeEventListener("pointerdown", h);
   }, []);
@@ -62,7 +74,9 @@ export default function Monitor() {
       }
     }
     const prev = alarmSigRef.current;
-    if (prev !== null && !muted) {
+    // Nur ausgeben, wenn die Tonausgabe freigeschaltet ist – sonst wird nichts
+    // angestossen, das der Browser zurueckhaelt und spaeter nachholt.
+    if (prev !== null && !muted && audioReady) {
       for (const m of missions) {
         if (m.status !== "aktiv") continue;
         const cur = sig.get(m.id);
@@ -94,10 +108,10 @@ export default function Monitor() {
       }
     }
     alarmSigRef.current = sig;
-  }, [missions, vehicles, muted, settings?.tts?.voice]);
+  }, [missions, vehicles, muted, audioReady, settings?.tts?.voice]);
 
   function toggleSound() {
-    unlockAudio();
+    enableAudio();
     setMuted((m) => {
       if (!m) { cancelSpeech(); clearTimeout(repeatTimerRef.current); } // wird gerade stummgeschaltet
       return !m;
@@ -128,6 +142,19 @@ export default function Monitor() {
           <span className="monitor-date">{now.toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</span>
         </div>
         <div className="monitor-bar-right">
+          {!audioReady ? (
+            <button
+              className="audio-enable"
+              onClick={enableAudio}
+              title="Klicken, um die akustische Alarmausgabe zu aktivieren"
+            >
+              🔇 Tonausgabe aktivieren
+            </button>
+          ) : (
+            <span className={`audio-status ${muted ? "muted" : "on"}`}>
+              {muted ? "🔕 Ansagen stumm" : "🔊 Ansagen aktiv"}
+            </span>
+          )}
           <button
             className="sound-btn"
             onClick={toggleSound}
@@ -439,6 +466,39 @@ function laufzeit(iso, now) {
   return `${m}:${String(s).padStart(2, "0")} min`;
 }
 
+// Eine ganze Zahl (0–999) als deutsches Zahlwort, z. B. 42 -> "zweiundvierzig".
+function zahlwort(n) {
+  const einer = ["null", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun"];
+  const teen = ["zehn", "elf", "zwölf", "dreizehn", "vierzehn", "fünfzehn", "sechzehn", "siebzehn", "achtzehn", "neunzehn"];
+  const zehner = ["", "", "zwanzig", "dreißig", "vierzig", "fünfzig", "sechzig", "siebzig", "achtzig", "neunzig"];
+  if (n < 0 || n > 999) return String(n);
+  if (n < 10) return einer[n];
+  if (n < 20) return teen[n - 10];
+  if (n < 100) {
+    const z = Math.floor(n / 10);
+    const e = n % 10;
+    if (e === 0) return zehner[z];
+    const eWort = e === 1 ? "ein" : einer[e];
+    return `${eWort}und${zehner[z]}`;
+  }
+  const h = Math.floor(n / 100);
+  const rest = n % 100;
+  const hWort = `${h === 1 ? "ein" : einer[h]}hundert`;
+  return rest === 0 ? hWort : `${hWort}${zahlwort(rest)}`;
+}
+
+// Funkrufname sprechbar machen: jede Zahlengruppe als deutsches Zahlwort
+// aussprechen, egal mit welchem Trenner ("11/42", "11 42", "11-42" ->
+// "elf zweiundvierzig"; "1/11/1" -> "eins elf eins"). Buchstaben-Teile
+// (z. B. "Florian") bleiben unveraendert.
+function funkrufnameSprechbar(name) {
+  return String(name || "")
+    .replace(/\d+/g, (d) => (d.length <= 3 ? zahlwort(Number(d)) : d))
+    .replace(/[/\-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // Vorlese-Text: Vorspann (je nach Priorität), Stichwort, Adresse (nur Straße + Hausnummer), Fahrzeuge
 function ansageText(mission, vehicles) {
   const teile = [];
@@ -453,9 +513,9 @@ function ansageText(mission, vehicles) {
     .map((id) => vehicles.find((v) => v.id === id))
     .filter((v) => v && !v.extern);
   if (dispo.length > 0) {
-    // Schrägstriche in Funkrufnamen besser sprechbar machen ("1/44/1" -> "1 44 1");
+    // Zahlengruppen als Zahlwörter aussprechen ("11/42" -> "elf zweiundvierzig");
     // Punkt zwischen den Fahrzeugen sorgt fuer eine kurze Pause (bessere Verstaendlichkeit)
-    const namen = dispo.map((v) => v.funkrufname.replace(/[/]/g, " ")).join(". ");
+    const namen = dispo.map((v) => funkrufnameSprechbar(v.funkrufname)).join(". ");
     teile.push(`Es fahren: ${namen}`);
   }
   return teile.join(". ") + ".";
@@ -469,7 +529,7 @@ function nachAnsageText(mission, vehicles, neuIds) {
   if (strasse) teile.push(strasse);
   const neu = (neuIds || []).map((id) => vehicles.find((v) => v.id === id)).filter((v) => v && !v.extern);
   if (neu.length > 0) {
-    const namen = neu.map((v) => v.funkrufname.replace(/[/]/g, " ")).join(". ");
+    const namen = neu.map((v) => funkrufnameSprechbar(v.funkrufname)).join(". ");
     teile.push(`Es fahren: ${namen}`);
   }
   return teile.join(". ") + ".";

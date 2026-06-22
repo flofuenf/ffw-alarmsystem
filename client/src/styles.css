@@ -196,6 +196,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; filter: none; pointer-even
 .monitor-bar-right { display: flex; align-items: center; gap: 14px; }
 .sound-btn { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; border-radius: 8px; padding: 6px 12px; font-size: 18px; line-height: 1; cursor: pointer; }
 .sound-btn:hover { background: #334155; }
+.audio-enable { background: #b91c1c; border: 1px solid #ef4444; color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 700; line-height: 1; cursor: pointer; animation: audiopulse 1.6s ease-in-out infinite; }
+.audio-enable:hover { background: #dc2626; }
+@keyframes audiopulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+.audio-status { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.audio-status.on { color: #22c55e; }
+.audio-status.muted { color: #94a3b8; }
 .conn { font-size: 13px; font-weight: 700; }
 .conn.on { color: #22c55e; }
 .conn.off { color: #ef4444; }
